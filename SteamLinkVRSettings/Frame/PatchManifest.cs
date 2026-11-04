@@ -13,6 +13,8 @@ public sealed class PatchManifest
     public const string SupportedCurrentPatchedSha256 = "34265101d56235e2f87e5b0e2f3fc2340ed1513a9b6d26f03c4fe12bafcbbc03";
     public const string SupportedStableOriginalSha256 = "1e846be041039798580a91452371f6288c614fb4c152126b137e2c693fb77eef";
     public const string SupportedStablePatchedSha256 = "d0aeec1b80d31da146365b4b65fa4adadd7230d288ebf0d65e040b3991f28c5e";
+    public const string SupportedBeta219OriginalSha256 = "f3d287efe205f8e42ed79e90957a19729adab0cdf7233e07bfa86f66a03fc0b7";
+    public const string SupportedBeta219PatchedSha256 = "79065bcc962ab5d5dcfbc6d5732f1da79b809bb67f546190cd2cd5fa0937aaa3";
     public const int SupportedFileLength = 13927576;
     public const int SupportedCapMbps = 500;
     public const int SupportedHevcLevel = 186; // NVENC's HEVC level 6.2 value.
@@ -51,13 +53,19 @@ public sealed class PatchManifest
         return result;
     }
 
-    public static PatchManifest LoadStable()
+    public static PatchManifest LoadStable() => LoadPinned("bitrate-patch-stable.json", 13908632,
+        SupportedStableOriginalSha256, SupportedStablePatchedSha256, "stable SteamVR");
+
+    public static PatchManifest LoadBeta219() => LoadPinned("bitrate-patch-beta-2.19.1.json", 14602904,
+        SupportedBeta219OriginalSha256, SupportedBeta219PatchedSha256, "SteamVR 2.19.1 beta");
+
+    private static PatchManifest LoadPinned(string name, int length, string original, string patched, string label)
     {
-        using var resource = typeof(PatchManifest).Assembly.GetManifestResourceStream("SteamLinkVRSettings.Assets.bitrate-patch-stable.json")
-            ?? File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Assets", "bitrate-patch-stable.json"));
+        using var resource = typeof(PatchManifest).Assembly.GetManifestResourceStream("SteamLinkVRSettings.Assets." + name)
+            ?? File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Assets", name));
         var result = Read(resource, requirePinned: false);
-        if (result.FileLength != 13908632 || result.OriginalSha256 != SupportedStableOriginalSha256 || result.PatchedSha256 != SupportedStablePatchedSha256)
-            throw new InvalidDataException("The manifest does not describe the verified stable SteamVR patch.");
+        if (result.FileLength != length || result.OriginalSha256 != original || result.PatchedSha256 != patched)
+            throw new InvalidDataException($"The manifest does not describe the verified {label} patch.");
         return result;
     }
 

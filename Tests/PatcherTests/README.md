@@ -5,10 +5,11 @@ patch round trips require local, unmodified driver fixtures:
 $env:SLVR_PATCHER_FIXTURE = 'C:\path\to\legacy-original\driver_vrlink.dll' # optional legacy harness
 $env:SLVR_PATCHER_CURRENT_FIXTURE = 'C:\path\to\beta-original\driver_vrlink.dll'
 $env:SLVR_PATCHER_STABLE_FIXTURE = 'C:\path\to\stable-original\driver_vrlink.dll'
+$env:SLVR_PATCHER_BETA219_FIXTURE = 'C:\path\to\beta-2.19.1-original\driver_vrlink.dll'
 dotnet test Tests/PatcherTests
 ```
 
-The legacy fixture must match SHA256 `5f6f063f1ece088491f572db8feb2f2433a5621d0adf7013de77b91604d146b5`, beta must match `d415ba30fab129b4737ae19a3c71d7628c27e450dd8bf0002a1d4dd98ed58a05`, and stable must match `1e846be041039798580a91452371f6288c614fb4c152126b137e2c693fb77eef`. No Valve binary is distributed with the app or tests. All mutations occur in copies in a unique temporary directory; fixtures are read only. The harness links production patcher sources without WinUI dependencies and injects simulated vrserver state only through the internal test constructor.
+The legacy fixture must match SHA256 `5f6f063f1ece088491f572db8feb2f2433a5621d0adf7013de77b91604d146b5`, beta must match `d415ba30fab129b4737ae19a3c71d7628c27e450dd8bf0002a1d4dd98ed58a05`, stable must match `1e846be041039798580a91452371f6288c614fb4c152126b137e2c693fb77eef`, and 2.19.1 beta must match `f3d287efe205f8e42ed79e90957a19729adab0cdf7233e07bfa86f66a03fc0b7`. No Valve binary is distributed with the app or tests. All mutations occur in copies in a unique temporary directory; fixtures are read only. The harness links production patcher sources without WinUI dependencies and injects simulated vrserver state only through the internal test constructor.
 
 Stable and beta tests run independently of the legacy harness. They include branch
 switches at the same path, separate preserved backups, known patched files without

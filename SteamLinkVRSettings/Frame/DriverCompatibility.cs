@@ -6,12 +6,13 @@ namespace SteamLinkVRSettings.Frame;
 // the driver's bytes, never from a manifest's version number or selected branch.
 internal static class DriverCompatibility
 {
-    public const string VerifiedVersions = "Verified bitrate-patch builds: public 25330290 and beta 25839986, plus the earlier beta driver. Other builds must pass the same driver checks. Codec and custom quality support are checked separately.";
+    public const string VerifiedVersions = "Verified bitrate-patch builds: public 25330290, beta 25839986 and 2.19.1 beta 26389675, plus the earlier beta driver. Other builds must pass the same driver checks. Codec and custom quality support are checked separately.";
 
     public static string ReferenceDriver(string? hash) => hash switch
     {
         PatchManifest.SupportedStableOriginalSha256 or PatchManifest.SupportedStablePatchedSha256 => "Public build 25330290",
         PatchManifest.SupportedCurrentOriginalSha256 or PatchManifest.SupportedCurrentPatchedSha256 => "Beta build 25839986",
+        PatchManifest.SupportedBeta219OriginalSha256 or PatchManifest.SupportedBeta219PatchedSha256 => "SteamVR 2.19.1 beta build 26389675",
         PatchManifest.SupportedOriginalSha256 or PatchManifest.SupportedPatchedSha256 => "Earlier verified beta driver",
         _ => "No reference hash match"
     };

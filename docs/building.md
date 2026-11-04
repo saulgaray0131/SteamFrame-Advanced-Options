@@ -120,6 +120,7 @@ dotnet test Tests\FrameReceiverDiagnosticsTests
 $env:SLVR_PATCHER_FIXTURE = "path\to\verified-original-driver_vrlink.dll"
 $env:SLVR_PATCHER_CURRENT_FIXTURE = "path\to\later-original.dll"   # optional
 $env:SLVR_PATCHER_STABLE_FIXTURE = "path\to\stable-original.dll"   # optional, public build 25330290
+$env:SLVR_PATCHER_BETA219_FIXTURE = "path\to\beta-2.19.1-original.dll"   # optional, beta build 26389675
 dotnet test Tests\PatcherTests
 ```
 

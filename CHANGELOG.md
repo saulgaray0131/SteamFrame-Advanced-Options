@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.8.3 — SteamVR 2.19.1 beta bitrate patch
+
+- The 500 Mbps / HEVC level 6.2 driver patch supports SteamVR 2.19.1 beta (build
+  26389675). Valve recompiled the encoder: the cap selector and private members are
+  unchanged, but the preset copy moved to its own routine and the encoder config is now
+  embedded, so level and tier are written directly instead of through the config pointer.
+  The scanner recognizes this as a separate complete family. It additionally proves that
+  initialization points the config member at the embedded copy, and resolves chained unwind
+  fragments to their primary routines. The verified manifest is embedded alongside the
+  stable and earlier beta manifests.
+- Earlier builds produce byte-identical patches. A retained earlier-beta original
+  (`8e7100b6…`) still yields its recorded patch, `1c4290b5…`.
+- Not yet supported on 2.19.1: Custom foveation bias stays unavailable because Valve
+  rewrote the gaze QP-map generator, and Auto tune's active-sender check still requires
+  beta 25839986. Both refuse safely instead of acting on an unverified layout.
+- Validation: the 2.19.1 install/backup/receipt/restore/refusal round trip passed on an
+  isolated copy. The patched disassembly shows 500 Mbps caps, a fixed reconfiguration level
+  and the preset-copy level stub tail-calling the CRT memcpy. CoreTests, BenchmarkTests,
+  StreamingHealthTests and StreamingFrameTraceTests passed. No live streaming test was
+  performed on this build.
+
 ## 1.8.2 — Driver compatibility and a lower-latency HEVC option
 
 - Added an optional Lower-latency HEVC preset: 200 Mbps, single pass and synchronous

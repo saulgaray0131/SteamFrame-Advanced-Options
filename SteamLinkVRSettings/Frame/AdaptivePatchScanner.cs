@@ -14,8 +14,26 @@ public static class AdaptivePatchScanner
     private const string StablePreset = "FF 96 38 9B 00 00 48 8B 8E 08 02 00 00 48 8D 95 18 03 00 00 41 B8 00 0E 00 00 E8 ?? ?? ?? ?? 66 0F 6F 05 ?? ?? ?? ?? F3 0F 7F 44 24 30 C7 44 24 40 1B 00 00 00";
     private const string Level = "B8 BA 00 00 00 C6 45 90 00 F3 0F 10 81 B8 00 00 00 B9 B7 00 00 00 F3 0F 58 05 ?? ?? ?? ?? F3 48 0F 2C D0 66 0F 6F 05 ?? ?? ?? ?? 49 0F AF D0 F3 0F 7F 45 A0 41 B8 09 00 00 00 49 0F AF D1 48 81 FA 00 00 80 7F 48 8D 15 ?? ?? ?? ?? 0F 4F C8 48 8B 86 70 02 00 00 89 88 A8 00 00 00 48 8B 86 70 02 00 00 C7 80 AC 00 00 00 01 00 00 00";
     private const string StableLevel = "B8 BA 00 00 00 C6 45 90 00 F3 0F 10 81 B8 00 00 00 B9 B7 00 00 00 F3 0F 58 05 ?? ?? ?? ?? F3 48 0F 2C D0 66 0F 6F 05 ?? ?? ?? ?? 49 0F AF D0 F3 0F 7F 45 A0 41 B8 09 00 00 00 49 0F AF D1 48 81 FA 00 00 80 7F 48 8D 15 ?? ?? ?? ?? 0F 4F C8 48 8B 86 08 02 00 00 89 88 A8 00 00 00 48 8B 86 08 02 00 00 C7 80 AC 00 00 00 01 00 00 00";
+    // SteamVR 2.19.1 beta keeps the beta cap selector, preset table member 0x9BA0 and
+    // config pointer 0x270, but embeds the config at encoder offset 0x928. Its level
+    // and tier are therefore written directly to 0x9D0/0x9D4 (config 0xA8/0xAC).
+    private const string Beta219Preset = "FF 96 A0 9B 00 00 48 8B 8E 70 02 00 00 48 8D 55 F8 41 B8 00 0E 00 00 E8 ?? ?? ?? ?? 0F 28 B4 24 00 15 00 00 45 33 E4 44 89 A6 B4 09 00 00";
+    private const string Beta219Level = "C7 86 D4 09 00 00 01 00 00 00 48 8B 88 98 03 00 00 B8 B7 00 00 00 F3 0F 10 81 C8 00 00 00 F3 0F 58 05 ?? ?? ?? ?? F3 48 0F 2C C8 48 0F AF CA BA BA 00 00 00 49 0F AF C8 48 81 F9 00 00 80 7F 0F 4F C2 8B 96 B0 01 00 00 89 86 D0 09 00 00";
+    private const string Beta219PresetVersions = "C7 45 F0 0B 00 04 F1 C7 45 F8 0B 00 07 F1";
+    private const string Beta219EmbeddedConfig = "48 8D 9E 28 09 00 00 C7 85 60 05 00 00 0B 00 07 F1 33 D2 48 89 9E 70 02 00 00";
     private const string Api = "C7 85 ?? ?? ?? ?? 0B 00 02 71 41 B8 F4 09 00 00";
     private const string PresetVersions = "C7 85 10 03 00 00 0B 00 04 F1 C7 85 18 03 00 00 0B 00 07 F1";
+
+    // Hook and LevelImmediate are byte offsets of the memcpy call and the 0xB7 level
+    // immediate inside their signatures. EmbeddedConfig, when present, must prove that
+    // direct member writes target the config that the preset copy fills.
+    private sealed record Family(string Caps, string Preset, int Hook, string Level, int LevelImmediate, string PresetVersions, string? EmbeddedConfig);
+    private static readonly Family[] Families =
+    [
+        new(Caps, Preset, 26, Level, 18, PresetVersions, null),
+        new(StableCaps, StablePreset, 26, StableLevel, 18, PresetVersions, null),
+        new(Caps, Beta219Preset, 23, Beta219Level, 18, Beta219PresetVersions, Beta219EmbeddedConfig),
+    ];
 
     public static PatchManifest Discover(byte[] source)
     {
@@ -23,17 +41,29 @@ public static class AdaptivePatchScanner
         // Stable and beta use different private encoder layouts. Select a complete
         // verified family; do not wildcard member offsets or mix their contexts.
         var cap = pe.Unique("Bitrate cap selector", Caps, StableCaps);
-        var stable = cap.Variant == 1;
-        var preset = pe.Unique("HEVC preset copy", stable ? StablePreset : Preset);
-        var level = pe.Unique("HEVC level configuration", stable ? StableLevel : Level);
+        var candidates = Families.Where(f => f.Caps == (cap.Variant == 1 ? StableCaps : Caps)).ToArray();
+        var preset = pe.Unique("HEVC preset copy", candidates.Select(f => f.Preset).ToArray());
+        var family = candidates[preset.Variant];
+        var level = pe.Unique("HEVC level configuration", family.Level);
         var api = pe.Unique("NVENC API initialization", Api);
         pe.FunctionContaining(api.Offset, api.Length);
         var presetFunction = pe.FunctionContaining(preset.Offset, preset.Length);
         pe.FunctionContaining(cap.Offset, cap.Length);
         var levelFunction = pe.FunctionContaining(level.Offset, level.Length);
         Require(levelFunction.Begin != presetFunction.Begin, "Preset and reconfiguration signatures are not distinct functions.");
-        Require(CountMatches(source, pe.Offset(presetFunction.Begin), checked((int)(presetFunction.End - presetFunction.Begin)), Pattern(PresetVersions)) == 1,
+        var presetStart = pe.Offset(presetFunction.Begin); var presetLength = checked((int)(presetFunction.End - presetFunction.Begin));
+        Require(CountMatches(source, presetStart, presetLength, Pattern(family.PresetVersions)) == 1,
             "The NVENC preset structure version/layout changed.");
+        if (family.EmbeddedConfig is not null)
+        {
+            // Encoder initialization points member 0x270 at the embedded config before
+            // calling the preset routine. MSVC splits these routines into chained unwind
+            // fragments, so compare primaries: initialization must be its own routine.
+            var config = pe.Unique("Embedded NVENC config", family.EmbeddedConfig);
+            var initialization = pe.Primary(pe.FunctionContaining(config.Offset, config.Length));
+            Require(initialization != pe.Primary(presetFunction) && initialization != pe.Primary(levelFunction),
+                "The embedded NVENC config layout changed.");
+        }
         // These loads are the general and wireless-adapter-present ceiling selectors.
         var generalRva = pe.Relative(cap.Offset + 5, cap.Offset + 9);
         var wirelessRva = pe.Relative(cap.Offset + 42, cap.Offset + 46);
@@ -44,7 +74,7 @@ public static class AdaptivePatchScanner
         // The precise E00-byte copy follows NVENC's HEVC preset query. Resolve its
         // call target through an actual PE import; a similarly named/static function
         // is not enough to establish the tail-call contract.
-        var hook = preset.Offset + 26;
+        var hook = preset.Offset + family.Hook;
         Require(source[hook] == 0xe8, "Preset copy is not a direct rel32 call.");
         var memcpyRva = pe.Relative(hook + 1, hook + 5);
         var memcpy = pe.Offset(memcpyRva, 6);
@@ -63,7 +93,8 @@ public static class AdaptivePatchScanner
         var changes = new List<PatchSegment>();
         Add(wireless, Convert.FromHexString("0000fa43"), "Wireless-adapter-present bitrate cap");
         Add(general, Convert.FromHexString("0000fa43"), "General bitrate cap");
-        Add(level.Offset + 18, Convert.FromHexString("ba000000"), "HEVC reconfiguration default level 6.2");
+        Require(source.AsSpan(level.Offset + family.LevelImmediate, 4).SequenceEqual(Convert.FromHexString("b7000000")), "HEVC level immediate changed.");
+        Add(level.Offset + family.LevelImmediate, Convert.FromHexString("ba000000"), "HEVC reconfiguration default level 6.2");
         Add(cave, stub, "Preset HEVC level 6.2 leaf tail call");
         Add(hook, call, "Route preset copy through the level fix");
         var virtualSize = new byte[4];
@@ -103,7 +134,7 @@ public static class AdaptivePatchScanner
     }
 
     private sealed record Section(int Header, uint Rva, uint VirtualSize, int Raw, int RawSize, uint Flags);
-    private sealed record Function(uint Begin, uint End);
+    private sealed record Function(uint Begin, uint End, uint Unwind);
     private sealed class Image
     {
         private readonly byte[] data;
@@ -146,7 +177,7 @@ public static class AdaptivePatchScanner
             {
                 var begin = U32(p); var end = U32(p + 4); var unwind = U32(p + 8);
                 Require(begin >= previousEnd && end > begin && IsExecutable(begin, checked((int)(end - begin))), "Malformed or overlapping function bounds.");
-                Offset(unwind, 4); Functions.Add(new(begin, end)); previousEnd = end;
+                Offset(unwind, 4); Functions.Add(new(begin, end, unwind)); previousEnd = end;
             }
         }
         public (int Offset, int Length, int Variant) Unique(string context, params string[] signatures)
@@ -170,6 +201,22 @@ public static class AdaptivePatchScanner
             var start = Rva(offset); var end = Rva(offset + length - 1) + 1;
             return Functions.SingleOrDefault(f => f.Begin <= start && end <= f.End)
                 ?? throw new InvalidDataException("Instruction context is outside a declared x64 function.");
+        }
+        public Function Primary(Function function)
+        {
+            for (int depth = 0; depth < 32; depth++)
+            {
+                // UNWIND_INFO: flags in the top five bits, then an even-padded code array
+                // followed by the parent RUNTIME_FUNCTION when UNW_FLAG_CHAININFO is set.
+                var info = Offset(function.Unwind & ~1u, 4);
+                if ((data[info] >> 3 & 4) == 0) return function;
+                var codes = (data[info + 2] + 1) & ~1;
+                var parent = Offset(checked(function.Unwind + 4 + (uint)codes * 2), 12);
+                var begin = U32(parent);
+                function = Functions.SingleOrDefault(f => f.Begin == begin && f.End == U32(parent + 4))
+                    ?? throw new InvalidDataException("Chained unwind information does not name a declared function.");
+            }
+            throw new InvalidDataException("Chained unwind information is too deep.");
         }
         public uint Rva(int offset)
         {

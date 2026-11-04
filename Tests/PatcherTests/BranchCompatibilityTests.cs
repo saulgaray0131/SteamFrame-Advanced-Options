@@ -6,9 +6,10 @@ namespace SteamLinkVRSettings.Tests;
 public sealed class BranchCompatibilityTests
 {
     [Theory]
-    [InlineData("SLVR_PATCHER_STABLE_FIXTURE", PatchManifest.SupportedStableOriginalSha256, PatchManifest.SupportedStablePatchedSha256)]
-    [InlineData("SLVR_PATCHER_CURRENT_FIXTURE", BitratePatcher.SupportedCurrentOriginalSha256, BitratePatcher.SupportedCurrentPatchedSha256)]
-    public async Task BranchPatchRoundTripPreservesOriginalAndRejectsUnsafeLayouts(string variable, string originalHash, string patchedHash)
+    [InlineData("SLVR_PATCHER_STABLE_FIXTURE", PatchManifest.SupportedStableOriginalSha256, PatchManifest.SupportedStablePatchedSha256, 24)]
+    [InlineData("SLVR_PATCHER_CURRENT_FIXTURE", BitratePatcher.SupportedCurrentOriginalSha256, BitratePatcher.SupportedCurrentPatchedSha256, 24)]
+    [InlineData("SLVR_PATCHER_BETA219_FIXTURE", PatchManifest.SupportedBeta219OriginalSha256, PatchManifest.SupportedBeta219PatchedSha256, 21)]
+    public async Task BranchPatchRoundTripPreservesOriginalAndRejectsUnsafeLayouts(string variable, string originalHash, string patchedHash, int presetMemberDistance)
     {
         var token = TestContext.Current.CancellationToken;
         var fixture = Environment.GetEnvironmentVariable(variable);
@@ -20,6 +21,8 @@ public sealed class BranchCompatibilityTests
         Assert.Equal(6, plan.Changes.Count);
         if (originalHash == PatchManifest.SupportedStableOriginalSha256)
             Assert.True(plan.DescribesSamePatch(PatchManifest.LoadStable()));
+        if (originalHash == PatchManifest.SupportedBeta219OriginalSha256)
+            Assert.True(plan.DescribesSamePatch(PatchManifest.LoadBeta219()));
         var root = Path.Combine(Path.GetTempPath(), "SteamLinkVRSettings-branch-patcher-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
@@ -83,7 +86,7 @@ public sealed class BranchCompatibilityTests
             // bitrate selector matches. Neither layout's offsets are wildcarded.
             var mixed = (byte[])original.Clone();
             var hook = plan.Changes.Single(x => x.Reason == "Route preset copy through the level fix").FileOffset;
-            mixed[hook - 24] ^= 0x98; // Switch the preset function-table member only.
+            mixed[hook - presetMemberDistance] ^= 0x98; // Switch the preset function-table member only.
             Assert.Throws<InvalidDataException>(() => AdaptivePatchScanner.Discover(mixed));
             var wrongCap = (byte[])original.Clone();
             wrongCap[plan.Changes.Single(x => x.Reason == "Wireless-adapter-present bitrate cap").FileOffset] ^= 1;

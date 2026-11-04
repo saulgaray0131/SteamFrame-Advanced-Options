@@ -179,3 +179,32 @@ package's `LocalCache/Local`; the unpackaged SteamVR process could not see the l
 path. Loading the same helper from an app-adjacent cache visible to both processes
 resolved the error. Steam overlay loader hooks were left intact. Detailed path and
 loader evidence remain in the diagnostic artifacts and are not bundled.
+
+## SteamVR 2.19.1 beta (build 26389675, November 3, 2026)
+
+Original `driver_vrlink.dll` SHA-256
+`f3d287efe205f8e42ed79e90957a19729adab0cdf7233e07bfa86f66a03fc0b7` (14,602,904 bytes)
+was reported as unsupported. Read-only disassembly (binutils objdump) of a local copy showed:
+
+- The beta cap selector (XMM10, member `0x140`) still matches. Its loads resolve to the
+  adjacent 350/232 Mbps constants.
+- Encoder initialization now runs `lea rbx,[rsi+0x928]` / `mov [rsi+0x270],rbx`. The NVENC
+  config is embedded in the encoder object and is the only writer of member `0x270`.
+- The preset query (`[rsi+0x9BA0]`) and the `0xE00`-byte copy through the imported CRT
+  `memcpy` are now in a separate routine. Its preset/config structures are on the frame at
+  `rbp-0x10`/`rbp-0x8` and still carry `0xF104000B`/`0xF107000B`.
+- The reconfiguration path still selects `0xB7`, or `0xBA` above the same pixel-rate threshold. It now
+  writes level/tier directly to `0x9D0`/`0x9D4` (config `0xA8`/`0xAC` at `0x928`).
+- MSVC split these routines into chained unwind fragments (`UNW_FLAG_CHAININFO`).
+
+Patched SHA-256 `79065bcc962ab5d5dcfbc6d5732f1da79b809bb67f546190cd2cd5fa0937aaa3`.
+Disassembly of the patched copy confirmed both caps at 500.0, the reconfiguration immediate
+at `0xBA`, and `mov dword [rdx+0xA8],0xBA; jmp memcpy` in the extended executable padding.
+
+The quality-hook fingerprints were reproduced exactly against an earlier beta driver. They
+cover each whole routine with external rel32 and RIP-relative displacements masked.
+None of the five match 2.19.1. The private fields the encode hook reads are unchanged:
+`0x14`, `0x208`, `0x270`, `0x9A11`, `0x9A4C`, `0x9A50` and the table at `0x9A60`. However,
+the gaze QP-map generator was rewritten (about 25% instruction similarity). `ApplyQualityMap`
+assumes Valve's four-region map layout, so the fingerprints were deliberately not refreshed.
+Re-enabling foveation bias needs a live map capture on this build.
