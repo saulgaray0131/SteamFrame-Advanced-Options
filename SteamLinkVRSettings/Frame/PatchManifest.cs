@@ -15,6 +15,8 @@ public sealed class PatchManifest
     public const string SupportedStablePatchedSha256 = "d0aeec1b80d31da146365b4b65fa4adadd7230d288ebf0d65e040b3991f28c5e";
     public const string SupportedBeta219OriginalSha256 = "f3d287efe205f8e42ed79e90957a19729adab0cdf7233e07bfa86f66a03fc0b7";
     public const string SupportedBeta219PatchedSha256 = "79065bcc962ab5d5dcfbc6d5732f1da79b809bb67f546190cd2cd5fa0937aaa3";
+    public const string SupportedBeta26496310OriginalSha256 = "4e8a1a949ae1f78c8210ba2ab59702cc30a0093129836ebe5e888075ca143e3a";
+    public const string SupportedBeta26496310PatchedSha256 = "90a2ada0427c3056512bff67e7244b0e11d7dc08add58f6ebd768414a1a3c3f7";
     public const int SupportedFileLength = 13927576;
     public const int SupportedCapMbps = 500;
     public const int SupportedHevcLevel = 186; // NVENC's HEVC level 6.2 value.
@@ -58,6 +60,9 @@ public sealed class PatchManifest
 
     public static PatchManifest LoadBeta219() => LoadPinned("bitrate-patch-beta-2.19.1.json", 14602904,
         SupportedBeta219OriginalSha256, SupportedBeta219PatchedSha256, "SteamVR 2.19.1 beta");
+
+    public static PatchManifest LoadBeta26496310() => LoadPinned("bitrate-patch-beta-26496310.json", 14604440,
+        SupportedBeta26496310OriginalSha256, SupportedBeta26496310PatchedSha256, "SteamVR beta build 26496310");
 
     private static PatchManifest LoadPinned(string name, int length, string original, string patched, string label)
     {

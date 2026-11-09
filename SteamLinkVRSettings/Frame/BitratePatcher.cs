@@ -146,6 +146,7 @@ public sealed class BitratePatcher
         if (hash == SupportedCurrentOriginalSha256) return manifest.ForCurrentBuild();
         if (hash == PatchManifest.SupportedStableOriginalSha256) return PatchManifest.LoadStable();
         if (hash == PatchManifest.SupportedBeta219OriginalSha256) return PatchManifest.LoadBeta219();
+        if (hash == PatchManifest.SupportedBeta26496310OriginalSha256) return PatchManifest.LoadBeta26496310();
         return AdaptivePatchScanner.Discover(bytes);
     }
     internal static BitratePatchState ClassifyHash(string hash, PatchManifest plan) =>
@@ -159,6 +160,7 @@ public sealed class BitratePatcher
         if (hash is SupportedCurrentOriginalSha256 or SupportedCurrentPatchedSha256) return manifest.ForCurrentBuild();
         if (hash is PatchManifest.SupportedStableOriginalSha256 or PatchManifest.SupportedStablePatchedSha256) return PatchManifest.LoadStable();
         if (hash is PatchManifest.SupportedBeta219OriginalSha256 or PatchManifest.SupportedBeta219PatchedSha256) return PatchManifest.LoadBeta219();
+        if (hash is PatchManifest.SupportedBeta26496310OriginalSha256 or PatchManifest.SupportedBeta26496310PatchedSha256) return PatchManifest.LoadBeta26496310();
         try { return AdaptivePatchScanner.Discover(data); }
         catch (Exception ex) when (ex is InvalidDataException or OverflowException or InvalidOperationException)
         {

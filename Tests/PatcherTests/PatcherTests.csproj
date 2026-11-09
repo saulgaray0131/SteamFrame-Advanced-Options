@@ -15,6 +15,7 @@
     <EmbeddedResource Include="../../SteamLinkVRSettings/Assets/bitrate-patch.json" LogicalName="SteamLinkVRSettings.Assets.bitrate-patch.json" />
     <EmbeddedResource Include="../../SteamLinkVRSettings/Assets/bitrate-patch-stable.json" LogicalName="SteamLinkVRSettings.Assets.bitrate-patch-stable.json" />
     <EmbeddedResource Include="../../SteamLinkVRSettings/Assets/bitrate-patch-beta-2.19.1.json" LogicalName="SteamLinkVRSettings.Assets.bitrate-patch-beta-2.19.1.json" />
+    <EmbeddedResource Include="../../SteamLinkVRSettings/Assets/bitrate-patch-beta-26496310.json" LogicalName="SteamLinkVRSettings.Assets.bitrate-patch-beta-26496310.json" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

@@ -19,20 +19,25 @@ public static class AdaptivePatchScanner
     // and tier are therefore written directly to 0x9D0/0x9D4 (config 0xA8/0xAC).
     private const string Beta219Preset = "FF 96 A0 9B 00 00 48 8B 8E 70 02 00 00 48 8D 55 F8 41 B8 00 0E 00 00 E8 ?? ?? ?? ?? 0F 28 B4 24 00 15 00 00 45 33 E4 44 89 A6 B4 09 00 00";
     private const string Beta219Level = "C7 86 D4 09 00 00 01 00 00 00 48 8B 88 98 03 00 00 B8 B7 00 00 00 F3 0F 10 81 C8 00 00 00 F3 0F 58 05 ?? ?? ?? ?? F3 48 0F 2C C8 48 0F AF CA BA BA 00 00 00 49 0F AF C8 48 81 F9 00 00 80 7F 0F 4F C2 8B 96 B0 01 00 00 89 86 D0 09 00 00";
+    // Build 26496310 recompiles that block: 0xBA is preloaded into r10d and the
+    // threshold compare uses rcx. Same members, immediate and level/tier writes.
+    private const string Beta219Level2 = "41 BA BA 00 00 00 C7 86 D4 09 00 00 01 00 00 00 48 8B 88 98 03 00 00 B8 B7 00 00 00 F3 0F 10 81 C8 00 00 00 B9 00 00 80 7F F3 0F 58 05 ?? ?? ?? ?? F3 48 0F 2C D0 49 0F AF D0 49 0F AF D1 48 3B D1 8B 96 B0 01 00 00 89 96 08 0A 00 00 41 0F 4F C2 89 86 D0 09 00 00";
     private const string Beta219PresetVersions = "C7 45 F0 0B 00 04 F1 C7 45 F8 0B 00 07 F1";
     private const string Beta219EmbeddedConfig = "48 8D 9E 28 09 00 00 C7 85 60 05 00 00 0B 00 07 F1 33 D2 48 89 9E 70 02 00 00";
     private const string Api = "C7 85 ?? ?? ?? ?? 0B 00 02 71 41 B8 F4 09 00 00";
     private const string PresetVersions = "C7 85 10 03 00 00 0B 00 04 F1 C7 85 18 03 00 00 0B 00 07 F1";
 
-    // Hook and LevelImmediate are byte offsets of the memcpy call and the 0xB7 level
-    // immediate inside their signatures. EmbeddedConfig, when present, must prove that
-    // direct member writes target the config that the preset copy fills.
-    private sealed record Family(string Caps, string Preset, int Hook, string Level, int LevelImmediate, string PresetVersions, string? EmbeddedConfig);
+    // Hook and each level's Immediate are byte offsets of the memcpy call and the 0xB7
+    // level immediate inside their signatures. A family lists every verified compilation
+    // of its level block; exactly one may match. EmbeddedConfig, when present, must prove
+    // that direct member writes target the config that the preset copy fills.
+    private sealed record LevelSignature(string Pattern, int Immediate);
+    private sealed record Family(string Caps, string Preset, int Hook, LevelSignature[] Levels, string PresetVersions, string? EmbeddedConfig);
     private static readonly Family[] Families =
     [
-        new(Caps, Preset, 26, Level, 18, PresetVersions, null),
-        new(StableCaps, StablePreset, 26, StableLevel, 18, PresetVersions, null),
-        new(Caps, Beta219Preset, 23, Beta219Level, 18, Beta219PresetVersions, Beta219EmbeddedConfig),
+        new(Caps, Preset, 26, [new(Level, 18)], PresetVersions, null),
+        new(StableCaps, StablePreset, 26, [new(StableLevel, 18)], PresetVersions, null),
+        new(Caps, Beta219Preset, 23, [new(Beta219Level, 18), new(Beta219Level2, 24)], Beta219PresetVersions, Beta219EmbeddedConfig),
     ];
 
     public static PatchManifest Discover(byte[] source)
@@ -44,7 +49,8 @@ public static class AdaptivePatchScanner
         var candidates = Families.Where(f => f.Caps == (cap.Variant == 1 ? StableCaps : Caps)).ToArray();
         var preset = pe.Unique("HEVC preset copy", candidates.Select(f => f.Preset).ToArray());
         var family = candidates[preset.Variant];
-        var level = pe.Unique("HEVC level configuration", family.Level);
+        var level = pe.Unique("HEVC level configuration", family.Levels.Select(l => l.Pattern).ToArray());
+        var levelImmediate = family.Levels[level.Variant].Immediate;
         var api = pe.Unique("NVENC API initialization", Api);
         pe.FunctionContaining(api.Offset, api.Length);
         var presetFunction = pe.FunctionContaining(preset.Offset, preset.Length);
@@ -93,8 +99,8 @@ public static class AdaptivePatchScanner
         var changes = new List<PatchSegment>();
         Add(wireless, Convert.FromHexString("0000fa43"), "Wireless-adapter-present bitrate cap");
         Add(general, Convert.FromHexString("0000fa43"), "General bitrate cap");
-        Require(source.AsSpan(level.Offset + family.LevelImmediate, 4).SequenceEqual(Convert.FromHexString("b7000000")), "HEVC level immediate changed.");
-        Add(level.Offset + family.LevelImmediate, Convert.FromHexString("ba000000"), "HEVC reconfiguration default level 6.2");
+        Require(source.AsSpan(level.Offset + levelImmediate, 4).SequenceEqual(Convert.FromHexString("b7000000")), "HEVC level immediate changed.");
+        Add(level.Offset + levelImmediate, Convert.FromHexString("ba000000"), "HEVC reconfiguration default level 6.2");
         Add(cave, stub, "Preset HEVC level 6.2 leaf tail call");
         Add(hook, call, "Route preset copy through the level fix");
         var virtualSize = new byte[4];

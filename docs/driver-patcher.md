@@ -68,6 +68,7 @@ Reference builds:
 | Beta build 25839986 | `d415ba30fab129b4737ae19a3c71d7628c27e450dd8bf0002a1d4dd98ed58a05` | `34265101d56235e2f87e5b0e2f3fc2340ed1513a9b6d26f03c4fe12bafcbbc03` |
 | Public stable build 25330290 | `1e846be041039798580a91452371f6288c614fb4c152126b137e2c693fb77eef` | `d0aeec1b80d31da146365b4b65fa4adadd7230d288ebf0d65e040b3991f28c5e` |
 | SteamVR 2.19.1 beta build 26389675 | `f3d287efe205f8e42ed79e90957a19729adab0cdf7233e07bfa86f66a03fc0b7` | `79065bcc962ab5d5dcfbc6d5732f1da79b809bb67f546190cd2cd5fa0937aaa3` |
+| SteamVR beta build 26496310 | `4e8a1a949ae1f78c8210ba2ab59702cc30a0093129836ebe5e888075ca143e3a` | `90a2ada0427c3056512bff67e7244b0e11d7dc08add58f6ebd768414a1a3c3f7` |
 
 The stable and beta drivers use different private member offsets and register selections.
 The scanner recognizes each complete instruction family separately, retaining the same

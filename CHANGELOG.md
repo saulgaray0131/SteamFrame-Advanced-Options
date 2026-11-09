@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.8.4 — SteamVR beta build 26496310 and fewer SteamVR connections
+
+- The 500 Mbps / HEVC level 6.2 driver patch supports SteamVR beta build 26496310
+  (driver `4e8a1a94…`). Valve recompiled the reconfiguration level block: 0xBA is
+  preloaded into r10d and the threshold compare uses rcx. Members, the 0xB7 immediate
+  and the 0x9D0/0x9D4 level/tier writes are unchanged. The 2.19 family now accepts
+  either verified compilation of that block (exactly one must match). Cap selector,
+  preset copy, preset versions and embedded-config proof are unchanged. Earlier builds
+  produce byte-identical patches.
+- Polls reuse one idle OpenVR connection instead of registering a new SteamVR client
+  for every read. A watcher disconnects on VREvent_Quit, runtime exit/restart or 10 s
+  of disuse. Live check: no extra connections in about 70 minutes of play, and the app
+  stayed open through SteamVR's graceful exit.
+- Validation: the build 26496310 patch was applied to an isolated copy and
+  disassembled (500 Mbps caps, level 0xBA, preset stub tail-calling the memcpy thunk).
+
 ## 1.8.3 — SteamVR 2.19.1 beta bitrate patch
 
 - The 500 Mbps / HEVC level 6.2 driver patch supports SteamVR 2.19.1 beta (build
